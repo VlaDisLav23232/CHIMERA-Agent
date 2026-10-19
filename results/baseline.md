@@ -36,4 +36,4 @@ Notes:
 - The baseline almost never says "no": 28 of 35 "no" cases are false positives. It does only slightly better than always answering "yes".
 - The errors are concentrated in patients with a **positive prior biopsy** (accuracy 0.53). That's the main place to improve.
 - Metrics computed locally from the downloaded outputs with cell C of [RUN_ALL_CASES.md](../RUN_ALL_CASES.md), since the zip was made before cell C ran.
-- Not yet the official Task 1 score (PLAN task 1.6).
+- Not yet the official Task 1 score (it also includes the case score from the official evaluator).
