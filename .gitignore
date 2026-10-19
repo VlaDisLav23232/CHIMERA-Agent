@@ -1,3 +1,6 @@
 data/**
 kaggle_upload/
 kaggle_upload.zip
+# Kaggle run outputs quote patient data: keep local, commit only the metric summaries (results/*.md)
+results/*/
+*.zip
