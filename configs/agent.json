@@ -1,0 +1,14 @@
+{
+  "data_dir": "data/task1",
+  "baseline_dir": "external/chimera-agent-baseline",
+  "embedding_dir": "external/chimera-agent-baseline/model/embedding_model",
+  "base_url": "http://localhost:11434/v1",
+  "model": "gemma4:e2b-it-q8_0",
+  "temperature": 1.0,
+  "top_p": 0.95,
+  "max_tokens": 4096,
+  "context_length": 16384,
+  "request_timeout": 600,
+  "max_iterations": 25,
+  "wall_seconds": 600
+}

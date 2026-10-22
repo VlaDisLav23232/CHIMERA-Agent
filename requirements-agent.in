@@ -1,0 +1,5 @@
+-c requirements.txt
+-e ./external/chimera-agent-baseline
+# Preserve compatibility with the optional judge already installed in .venv.
+click<8.4
+rich<15
