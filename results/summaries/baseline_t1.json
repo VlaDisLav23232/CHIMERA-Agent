@@ -1,0 +1,120 @@
+{
+ "name": "baseline_t1",
+ "system": "baseline",
+ "model": "gemma4:e2b-it-q8_0",
+ "code_commit": "1afa788efc21c0e0144706d75170b0a4cd267367",
+ "temperature": 1.0,
+ "seed": null,
+ "split": "dev",
+ "judge": "none",
+ "evaluator_commit": "92365b9",
+ "date": "2026-10-22",
+ "run_dir": "results/baseline_run",
+ "metrics": {
+  "task1_score": 0.6623486006244159,
+  "task1_score_ci": [
+   0.5714311515561785,
+   0.7462480759007074
+  ],
+  "mean_case_score": 0.5203493751618752,
+  "f1_yes_ci": [
+   0.7073170731707317,
+   0.8865979381443299
+  ],
+  "components": {
+   "confidence_score": 0.7738095238095238,
+   "variable_weight_score": 0.6404761904761905,
+   "important_decisive_factor_score": 0.5708225636797065,
+   "tool_score": 0.8543650793650793,
+   "section_grounding_score": 0.9432539682539682,
+   "rationale_score": null
+  },
+  "clinical": {
+   "n": 60,
+   "tp": 37,
+   "fp": 18,
+   "tn": 5,
+   "fn": 0,
+   "invalid": 0,
+   "accuracy": 0.7,
+   "f1_yes": 0.8043478260869565,
+   "sensitivity": 1.0,
+   "specificity": 0.21739130434782608,
+   "ppv": 0.6727272727272727,
+   "npv": 1.0
+  },
+  "by_prior_biopsy": {
+   "Negative": {
+    "n": 12,
+    "tp": 9,
+    "fp": 3,
+    "tn": 0,
+    "fn": 0,
+    "invalid": 0,
+    "accuracy": 0.75,
+    "f1_yes": 0.8571428571428571,
+    "sensitivity": 1.0,
+    "specificity": 0.0,
+    "ppv": 0.75,
+    "npv": null
+   },
+   "None": {
+    "n": 16,
+    "tp": 13,
+    "fp": 0,
+    "tn": 3,
+    "fn": 0,
+    "invalid": 0,
+    "accuracy": 1.0,
+    "f1_yes": 1.0,
+    "sensitivity": 1.0,
+    "specificity": 1.0,
+    "ppv": 1.0,
+    "npv": 1.0
+   },
+   "Positive": {
+    "n": 32,
+    "tp": 15,
+    "fp": 15,
+    "tn": 2,
+    "fn": 0,
+    "invalid": 0,
+    "accuracy": 0.53125,
+    "f1_yes": 0.6666666666666666,
+    "sensitivity": 1.0,
+    "specificity": 0.11764705882352941,
+    "ppv": 0.5,
+    "npv": 1.0
+   }
+  },
+  "confidence": {
+   "by_level": {
+    "clear": {
+     "n": 60,
+     "accuracy": 0.7
+    },
+    "borderline": {
+     "n": 0,
+     "accuracy": null
+    },
+    "uncertain": {
+     "n": 0,
+     "accuracy": null
+    }
+   },
+   "agreement_with_reference": 0.65
+  },
+  "tools": {
+   "tools_per_case": 2.15,
+   "reference_tools_per_case": 3.1,
+   "share_of_cases": {
+    "radiology_report": 1.0,
+    "psa_trend": 0.6,
+    "laboratory_results": 0.25,
+    "previous_notes": 0.16666666666666666,
+    "family_history": 0.13333333333333333
+   },
+   "recall_of_reference": 0.6031073446327684
+  }
+ }
+}
