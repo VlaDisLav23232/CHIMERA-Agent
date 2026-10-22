@@ -1,6 +1,16 @@
 data/**
 kaggle_upload/
 kaggle_upload.zip
-# Kaggle run outputs quote patient data: keep local, commit only the metric summaries (results/*.md)
+# Run outputs and per-case scores quote patient data: keep local, commit only aggregate summaries
 results/*/
+!results/summaries/
 *.zip
+.venv/
+__pycache__/
+.DS_Store
+.env
+.env.*
+# Challenge data release (patient data)
+train_release/
+# Organizers evaluator, fetched by scripts/fetch_evaluator.sh
+external/
