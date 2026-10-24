@@ -7,12 +7,17 @@ CLINICAL = "prostate-biopsy-decision-clinical-data.json"
 EMBEDDING = "prostate-modality-level-neural-representations.json"
 
 
-def select_case(split_file: Path, requested: str | None) -> str:
+def select_cases(split_file: Path, requested: list[str], all_dev: bool) -> list[str]:
     dev = json.loads(split_file.read_text())["dev"]
-    case_id = requested if requested is not None else sorted(dev)[0]
-    if case_id not in dev or Path(case_id).name != case_id:
-        raise ValueError("Select a case from the committed dev split")
-    return case_id
+    if all_dev and requested:
+        raise ValueError("Use either --case or --all-dev, not both")
+    cases = sorted(dev) if all_dev else requested or [sorted(dev)[0]]
+    if len(set(cases)) != len(cases):
+        raise ValueError("A case was requested more than once")
+    for case_id in cases:
+        if case_id not in dev or Path(case_id).name != case_id:
+            raise ValueError(f"Select cases from the committed dev split: {case_id}")
+    return cases
 
 
 def stage_case(source: Path, destination: Path, case_id: str) -> Path:
