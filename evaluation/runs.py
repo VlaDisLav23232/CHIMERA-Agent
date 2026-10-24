@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from evaluation.official import DATA_DIR, ROOT
@@ -51,16 +52,25 @@ def read_run_info(run_dir: Path) -> dict:
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+def check_name(name: str) -> None:
+    # Names become path components under results/; anything else could escape it.
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", name):
+        raise ValueError(f"Run name {name!r} must contain only letters, numbers, underscores or hyphens")
+
+
 def write_cases(name: str, cases: list[dict]) -> None:
+    check_name(name)
     CASES_DIR.joinpath(name).mkdir(parents=True, exist_ok=True)
     (CASES_DIR / name / "cases.json").write_text(json.dumps(cases, indent=1))
 
 
 def read_cases(name: str) -> list[dict]:
+    check_name(name)
     return json.loads((CASES_DIR / name / "cases.json").read_text())
 
 
 def write_summary(name: str, summary: dict, markdown: str) -> None:
+    check_name(name)
     SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
     (SUMMARIES_DIR / f"{name}.json").write_text(json.dumps(summary, indent=1))
     (SUMMARIES_DIR / f"{name}.md").write_text(markdown)

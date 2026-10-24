@@ -95,6 +95,10 @@ def main() -> None:
     p.add_argument("--confirm-test", action="store_true")
     a = p.parse_args()
 
+    try:
+        runs.check_name(a.name)
+    except ValueError as e:
+        p.error(str(e))
     if a.split in ("test", "all") and not a.confirm_test:
         p.error(f"--split {a.split} includes test cases: add --confirm-test")
     if not (a.run_dir / "output" / "task1").is_dir():
@@ -109,7 +113,7 @@ def main() -> None:
     info = runs.read_run_info(a.run_dir)
     summary = {
         "name": a.name, "system": a.system, "model": info.get("ollama_model", "unknown"),
-        "code_commit": info.get("baseline_commit") or info.get("code_commit"),
+        "code_commit": info.get("code_commit"), "baseline_commit": info.get("baseline_commit"),
         "config_id": info.get("config_id"),
         "temperature": a.temperature, "seed": a.seed, "split": a.split, "judge": judge_label,
         "evaluator_commit": official.COMMIT, "date": date.today().isoformat(), "run_dir": str(a.run_dir),
