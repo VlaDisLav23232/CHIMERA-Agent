@@ -19,7 +19,8 @@ per-case time limit, batch runs and run metadata.
 Runs need Linux, macOS or WSL: the runner stops process groups with `os.killpg`
 and the baseline's guideline search talks to its embedding service over a Unix
 socket. Full runs are done on Kaggle with
-[notebooks/02_kaggle_agent_run.ipynb](../notebooks/02_kaggle_agent_run.ipynb).
+[notebooks/02_kaggle_agent_run.ipynb](../notebooks/02_kaggle_agent_run.ipynb) (agent_v1) and
+[notebooks/03_kaggle_agent_v2_run.ipynb](../notebooks/03_kaggle_agent_v2_run.ipynb) (agent_v2).
 
 ## Setup
 
