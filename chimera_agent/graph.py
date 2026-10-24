@@ -24,6 +24,7 @@ class State(TypedDict, total=False):
     decision: DecisionRecord
     checks: Checks
     decision_attempts: int
+    escape_repairs: int
     decision_s: float
 
 
@@ -60,9 +61,9 @@ def create_graph(model: BaseChatModel, tools: list[BaseTool], system_prompt: str
         items, calls = build_ledger(prompt, state["messages"])
         agent_message = final_agent_text(state["messages"])
         eligible = eligible_variables(1, revealed_tools(calls))
-        record, attempts = await decide(model, items, agent_message, eligible)
+        record, attempts, repairs = await decide(model, items, agent_message, eligible)
         return {"evidence": items, "tool_calls": calls, "agent_message": agent_message, "decision": record,
-                "checks": run_checks(record, items, calls), "decision_attempts": attempts,
+                "checks": run_checks(record, items, calls), "decision_attempts": attempts, "escape_repairs": repairs,
                 "decision_s": time.monotonic() - started}
 
     builder = StateGraph(State)
@@ -84,7 +85,7 @@ async def run_case(model: BaseChatModel, tools: list[BaseTool], system_prompt: s
     state = await graph.ainvoke({"messages": [HumanMessage(content=context)]}, {"recursion_limit": max_iterations})
     return Trace(case_id=case_id, evidence=state["evidence"], tool_calls=state["tool_calls"],
                  agent_message=state["agent_message"], decision=state["decision"], checks=state["checks"],
-                 decision_attempts=state["decision_attempts"],
+                 decision_attempts=state["decision_attempts"], escape_repairs=state["escape_repairs"],
                  llm_calls=state["agent_calls"] + state["decision_attempts"],
                  timings=Timings(agent_s=round(state["agent_s"], 3), decision_s=round(state["decision_s"], 3),
                                  total_s=round(time.monotonic() - started, 3)))

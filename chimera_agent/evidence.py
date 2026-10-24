@@ -7,11 +7,13 @@ from chimera_agent_baseline.tools.definitions import TASK1_TOOLS
 from langchain_core.messages import AIMessage, ToolMessage
 from pydantic import BaseModel, ConfigDict, Field
 
-TRACE_SCHEMA = "chimera_agent.trace/1"
+TRACE_SCHEMA = "chimera_agent.trace/2"
 GUIDELINE_TOOL = "search_guidelines"
 CASE_MISMATCH = "case_id mismatch"
 SECTION_BY_TOOL = {spec.name: spec.fields[0] for spec in TASK1_TOOLS}
 NUMBER = re.compile(r"\d+(?:\.\d+)?")
+# Fixed scale legends of the baseline case template; their digits are not patient values.
+PROMPT_LEGENDS = ("(1–2 low · 3 equivocal · 4–5 high risk)", "(clinically significant PCa = ISUP ≥ 2)")
 
 
 class Strict(BaseModel):
@@ -75,7 +77,7 @@ class Timings(Strict):
 class Trace(Strict):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    trace_schema: Literal["chimera_agent.trace/1"] = Field(TRACE_SCHEMA, alias="schema")
+    trace_schema: Literal["chimera_agent.trace/2"] = Field(TRACE_SCHEMA, alias="schema")
     case_id: str
     system: Literal["agent_v1"] = "agent_v1"
     evidence: list[EvidenceItem]
@@ -84,6 +86,7 @@ class Trace(Strict):
     decision: DecisionRecord
     checks: Checks
     decision_attempts: int
+    escape_repairs: int
     llm_calls: int
     timings: Timings
 
@@ -160,6 +163,15 @@ def _numbers(text: str) -> set[float]:
     return {float(n) for n in NUMBER.findall(text)}
 
 
+def _evidence_text(item: EvidenceItem) -> str:
+    if item.kind == "prompt":
+        text = item.content
+        for legend in PROMPT_LEGENDS:
+            text = text.replace(legend, "")
+        return text
+    return json.dumps(item.content, ensure_ascii=False)
+
+
 def run_checks(decision: DecisionRecord, items: list[EvidenceItem], calls: list[ToolCallRecord]) -> Checks:
     by_id = {item.id: item for item in items}
     missing, unsupported = [], []
@@ -167,7 +179,7 @@ def run_checks(decision: DecisionRecord, items: list[EvidenceItem], calls: list[
         absent = [i for i in claim.evidence if i not in by_id]
         if absent:
             missing.append(CitationIssue(claim=index, ids=absent))
-        cited = " ".join(json.dumps(by_id[i].content, ensure_ascii=False) for i in claim.evidence if i in by_id)
+        cited = " ".join(_evidence_text(by_id[i]) for i in claim.evidence if i in by_id)
         known = _numbers(cited)
         numbers = [n for n in NUMBER.findall(claim.text) if float(n) not in known]
         if numbers:

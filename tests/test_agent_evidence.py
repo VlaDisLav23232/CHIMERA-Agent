@@ -91,6 +91,13 @@ class ChecksTest(unittest.TestCase):
         self.assertEqual([(i.claim, i.ids) for i in checks.missing_citations], [(1, ["E9"])])
         self.assertEqual([(i.claim, i.numbers) for i in checks.unsupported_numbers], [(0, ["9.1"])])
 
+    def test_template_legend_digits_are_not_evidence(self):
+        prompt = ("PI-RADS score: 4 (1–2 low · 3 equivocal · 4–5 high risk) "
+                  "csPCa: 0.8 (clinically significant PCa = ISUP ≥ 2)")
+        items, calls = build_ledger(prompt, [])
+        checks = run_checks(decision(Claim(text="PI-RADS 4, not 5; ISUP 2.", evidence=["P"])), items, calls)
+        self.assertEqual([i.numbers for i in checks.unsupported_numbers], [["5", "2"]])
+
     def test_numbers_only_count_in_cited_evidence(self):
         checks = run_checks(decision(Claim(text="PSA 7.2.", evidence=["E1"])), self.items, self.calls)
         self.assertEqual([i.numbers for i in checks.unsupported_numbers], [["7.2"]])
@@ -110,10 +117,10 @@ class TraceTest(unittest.TestCase):
         items, calls = build_ledger(PROMPT, synthetic_messages())
         d = decision(Claim(text="PI-RADS 4.", evidence=["P"]))
         trace = Trace(case_id="c1", evidence=items, tool_calls=calls, agent_message="Recommend biopsy.", decision=d,
-                      checks=run_checks(d, items, calls), decision_attempts=1, llm_calls=4,
+                      checks=run_checks(d, items, calls), decision_attempts=1, escape_repairs=0, llm_calls=4,
                       timings=Timings(agent_s=1.0, decision_s=0.5, total_s=1.6))
         data = json.loads(trace.model_dump_json(by_alias=True))
-        self.assertEqual(data["schema"], "chimera_agent.trace/1")
+        self.assertEqual(data["schema"], "chimera_agent.trace/2")
         self.assertEqual(Trace.model_validate(data), trace)
         with self.assertRaises(ValueError):
-            Trace.model_validate({**data, "schema": "chimera_agent.trace/0"})
+            Trace.model_validate({**data, "schema": "chimera_agent.trace/1"})

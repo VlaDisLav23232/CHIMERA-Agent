@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import StructuredTool
 
-from chimera_agent.decision import official_output
+from chimera_agent.decision import official_output, repair_apostrophes
 from chimera_agent.graph import run_case
 
 CONTEXT = "Case ID: c1\nPSA: 7.2 ng/mL\nPI-RADS score: 4"
@@ -96,6 +96,21 @@ class GraphTest(unittest.TestCase):
             {"text": "PSA 7.2 ng/mL supports biopsy.", "evidence": ["P"]}])])
         self.assertEqual(trace.decision_attempts, 2)
         self.assertIn("did not validate", model.prompts[-1][-1].content)
+
+    def test_apostrophe_escapes_are_repaired_and_counted(self):
+        backslash = chr(92)
+        claims = [{"text": "PI-RADS 4 on the patient's record.", "evidence": ["P"]},
+                  {"text": "PSA 7.2 ng/mL supports the patient's biopsy.", "evidence": ["P"]}]
+        escaped = AIMessage(content=form(claims=claims).content.replace("'", backslash + "'"))
+        trace, _ = run([AIMessage(content="Done."), escaped])
+        self.assertEqual((trace.decision_attempts, trace.escape_repairs), (1, 2))
+        self.assertEqual(trace.decision.claims[0].text, "PI-RADS 4 on the patient's record.")
+
+    def test_repair_leaves_escaped_backslashes_alone(self):
+        b = chr(92)
+        self.assertEqual(repair_apostrophes("a" + b + "'b"), ("a'b", 1))
+        self.assertEqual(repair_apostrophes("a" + b + b + "'b"), ("a" + b + b + "'b", 0))
+        self.assertEqual(repair_apostrophes("a" + b + b + b + "'b"), ("a" + b + b + "'b", 1))
 
     def test_three_invalid_forms_fail(self):
         with self.assertRaisesRegex(RuntimeError, "failed validation 3 times"):

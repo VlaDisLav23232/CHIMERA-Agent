@@ -1,4 +1,5 @@
 import json
+import re
 
 from chimera_agent_baseline.agent.form_fill import _extract_json_object
 from chimera_agent_baseline.output.schema import Confidence, Weight, normalise_to_full_shape
@@ -11,6 +12,9 @@ from chimera_agent.evidence import Claim, DecisionRecord, EvidenceItem, ToolCall
 # Same attempt budget as the upstream form-fill node, so parse robustness is not a difference between systems.
 DECISION_ATTEMPTS = 3
 MIN_FREE_TEXT = 40
+# Gemma escapes apostrophes as \' inside JSON strings; JSON has no such escape. Only an unescaped backslash
+# directly before an apostrophe is repaired, and every repair is counted in the trace.
+APOSTROPHE_ESCAPE = re.compile(r"(?<!\\)((?:\\\\)*)\\'")
 
 SYSTEM_PROMPT = (
     "You are completing the biopsy decision form for the prostate case you just analysed. "
@@ -78,8 +82,12 @@ def decision_prompt(items: list[EvidenceItem], agent_message: str, eligible: lis
     )
 
 
+def repair_apostrophes(text: str) -> tuple[str, int]:
+    return APOSTROPHE_ESCAPE.subn(lambda match: match.group(1) + "'", text)
+
+
 async def decide(model: BaseChatModel, items: list[EvidenceItem], agent_message: str,
-                 eligible: list[str]) -> tuple[DecisionRecord, int]:
+                 eligible: list[str]) -> tuple[DecisionRecord, int, int]:
     form = decision_model(eligible)
     prompt = decision_prompt(items, agent_message, eligible)
     errors = []
@@ -87,13 +95,14 @@ async def decide(model: BaseChatModel, items: list[EvidenceItem], agent_message:
         hint = f"\n\nYour previous answer did not validate:\n{errors[-1]}\nOutput ONLY the corrected JSON." if errors else ""
         response = await model.ainvoke([SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt + hint)])
         try:
-            parsed = form.model_validate_json(_extract_json_object(message_text(response.content)))
+            text, repairs = repair_apostrophes(_extract_json_object(message_text(response.content)))
+            parsed = form.model_validate_json(text)
         except ValidationError as error:
             errors.append(str(error))
             continue
         record = DecisionRecord(biopsy_decision=parsed.biopsy_decision, confidence=parsed.confidence,
                                 variable_weights=parsed.variable_weights.model_dump(), claims=parsed.claims)
-        return record, attempt
+        return record, attempt, repairs
     raise RuntimeError(f"Decision form failed validation {DECISION_ATTEMPTS} times: {errors}")
 
 

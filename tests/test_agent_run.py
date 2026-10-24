@@ -32,7 +32,7 @@ def write_outputs(case_dir: Path, case_id: str, reasoning: dict | None = None, t
                                   claims=[Claim(text="PI-RADS 4.", evidence=["P"])])
         (case_dir / "work/trace.json").write_text(Trace(
             case_id=case_id, evidence=items, tool_calls=calls, agent_message="", decision=decision,
-            checks=run_checks(decision, items, calls), decision_attempts=1, llm_calls=2,
+            checks=run_checks(decision, items, calls), decision_attempts=1, escape_repairs=0, llm_calls=2,
             timings=Timings(agent_s=1, decision_s=1, total_s=2)).model_dump_json(by_alias=True))
 
 

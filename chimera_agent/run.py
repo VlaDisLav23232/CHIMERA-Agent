@@ -82,10 +82,12 @@ def publish(case_dir: Path, run_dir: Path, case_id: str, system: str) -> None:
         trace = Trace.model_validate_json((case_dir / "work/trace.json").read_text())
         if trace.case_id != case_id:
             raise ValueError("Trace belongs to another case")
-        (run_dir / "trace").mkdir(exist_ok=True)
-        (case_dir / "work/trace.json").rename(run_dir / "trace" / f"{case_id}.json")
+    # Everything is validated above; the official files move first so a trace is never published without them.
     (run_dir / "output/task1").mkdir(parents=True, exist_ok=True)
     case.rename(run_dir / "output/task1" / case_id)
+    if system == "agent_v1":
+        (run_dir / "trace").mkdir(exist_ok=True)
+        (case_dir / "work/trace.json").rename(run_dir / "trace" / f"{case_id}.json")
 
 
 def run_one(settings: Settings, run_dir: Path, system: str, case_id: str, reference: dict | None) -> dict:

@@ -84,7 +84,7 @@ All run files are local under results/<name>/ and may contain patient informatio
 - cases/<case>/work/: partial outputs kept if the case fails.
 - output/task1/<case>/: the two official JSON files, published per case only on success.
 - trace/<case>.json: agent_v1 only, the evidence items, tool calls, claims with
-  citations, check results, timings and LLM call count (`schema: chimera_agent.trace/1`,
+  citations, check results, timings and LLM call count (`schema: chimera_agent.trace/2`,
   defined in evidence.py).
 - run_info.json: run and per-case status, effective settings, code/model identity and timing.
 
