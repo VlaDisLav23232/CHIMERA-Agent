@@ -65,11 +65,14 @@ def free_text(claims: list[Claim]) -> str:
     return " ".join(c.text.strip() for c in claims)
 
 
-def decision_prompt(items: list[EvidenceItem], agent_message: str, eligible: list[str]) -> str:
+def decision_prompt(items: list[EvidenceItem], agent_message: str, eligible: list[str], guidance: str) -> str:
     weight_lines = ",\n".join(f'    "{v}": "not_used" | "noted" | "important" | "decisive"' for v in eligible)
+    # agent_v1 passes no guidance and must get exactly the prompt of its dev run.
+    guidance_block = f"{guidance}\n\n" if guidance else ""
     return (
         f"Evidence items:\n\n{render_evidence(items)}\n\n"
         f'Your own analysis (not evidence; do not cite it):\n"""\n{agent_message}\n"""\n\n'
+        f"{guidance_block}"
         "Fill in the form. Weight each listed variable by how much it drove your recommendation. Write 2-4 "
         "claims naming the factors that drove it; each claim cites the IDs of the evidence items that support it.\n\n"
         "{\n"
@@ -86,10 +89,10 @@ def repair_apostrophes(text: str) -> tuple[str, int]:
     return APOSTROPHE_ESCAPE.subn(lambda match: match.group(1) + "'", text)
 
 
-async def decide(model: BaseChatModel, items: list[EvidenceItem], agent_message: str,
-                 eligible: list[str]) -> tuple[DecisionRecord, int, int]:
+async def decide(model: BaseChatModel, items: list[EvidenceItem], agent_message: str, eligible: list[str],
+                 guidance: str) -> tuple[DecisionRecord, int, int]:
     form = decision_model(eligible)
-    prompt = decision_prompt(items, agent_message, eligible)
+    prompt = decision_prompt(items, agent_message, eligible, guidance)
     errors = []
     for attempt in range(1, DECISION_ATTEMPTS + 1):
         hint = f"\n\nYour previous answer did not validate:\n{errors[-1]}\nOutput ONLY the corrected JSON." if errors else ""

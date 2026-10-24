@@ -1,6 +1,6 @@
 # Task 1 agent
 
-Runs development cases through one of two systems:
+Runs development cases through one of three systems:
 
 - `baseline_scaffold`: the organizers' unchanged graph, as in the baseline run.
 - `agent_v1`: our graph. It keeps the baseline's ReAct loop, tools, prompts and
@@ -8,6 +8,10 @@ Runs development cases through one of two systems:
   retrieved document and guideline passage under an ID (`P`, `E1…`, `G1…`), writes
   2-4 claims that cite those IDs, and records citation, number and weight checks
   in a per-case trace.
+- `agent_v2`: the agent_v1 graph with our own prompts (prompts.py). The agent's
+  system prompt lists only the Task 1 tools and explains what a prior positive
+  biopsy means for a new biopsy decision; the decision step also gets that framing
+  and definitions of the three confidence levels. Everything else is as in agent_v1.
 
 Our code adds safe input preparation, explicit settings, readiness checks, a
 per-case time limit, batch runs and run metadata.
@@ -51,8 +55,8 @@ The optional evaluator judge model is not part of scaffold setup.
 
     .venv/bin/python -m chimera_agent.run --name smoke_01 --system agent_v1
 
-`--system` is required (`agent_v1` or `baseline_scaffold`). Without case options
-the first sorted dev case from splits/task1.json runs. Repeat `--case <dev-case-id>`
+`--system` is required (`agent_v1`, `agent_v2` or `baseline_scaffold`). Without case
+options the first sorted dev case from splits/task1.json runs. Repeat `--case <dev-case-id>`
 for several cases, or use `--all-dev` for the whole dev split. Test IDs are rejected.
 Use --config <json-path> for explicit settings; defaults are in configs/agent.json.
 The endpoint must be local and the model must match the baseline.
@@ -83,9 +87,9 @@ All run files are local under results/<name>/ and may contain patient informatio
 - cases/<case>/worker.log: diagnostics.
 - cases/<case>/work/: partial outputs kept if the case fails.
 - output/task1/<case>/: the two official JSON files, published per case only on success.
-- trace/<case>.json: agent_v1 only, the evidence items, tool calls, claims with
-  citations, check results, timings and LLM call count (`schema: chimera_agent.trace/2`,
-  defined in evidence.py).
+- trace/<case>.json: agent_v1 and agent_v2, the system name, the evidence items,
+  tool calls, claims with citations, check results, timings and LLM call count
+  (`schema: chimera_agent.trace/2`, defined in evidence.py).
 - run_info.json: run and per-case status, effective settings, code/model identity and timing.
 
 No output files are fabricated after an error. Staging is a filename allowlist,
@@ -103,9 +107,9 @@ keep such runs out of the shared leaderboard.
 
 run.py owns the batch, staging, process supervision, metadata and success-only publication.
 worker.py integrates the pinned baseline, manages the embedding service and runs
-the chosen system. graph.py is the agent_v1 graph, decision.py its decision step,
-evidence.py the evidence ledger, checks and trace schema. config.py and inputs.py
-contain settings and input preparation. Inference does
+the chosen system. graph.py is our graph, decision.py its decision step,
+prompts.py the agent_v2 prompts, evidence.py the evidence ledger, checks and trace
+schema. config.py and inputs.py contain settings and input preparation. Inference does
 not import the evaluator, which alone has access to reference answers.
 
     .venv/bin/python -m unittest discover -s tests -t .

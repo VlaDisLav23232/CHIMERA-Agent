@@ -105,13 +105,21 @@ def execute(case_dir: Path, settings: Settings, system: str, resource_dir: Path)
         if system == "baseline_scaffold":
             asyncio.run(run_agent(cfg))
         else:
-            asyncio.run(run_agent_v1(cfg, case_dir, settings.baseline_dir))
+            asyncio.run(run_traced(cfg, case_dir, settings.baseline_dir, system))
     finally:
         service.stop()
 
 
-async def run_agent_v1(cfg, case_dir: Path, baseline_dir: Path) -> None:
+def prompts_for(system: str) -> tuple[str, str]:
+    # The agent system prompt and the decision guidance; only these differ between the traced systems.
     from chimera_agent_baseline.agent.prompts import build_system_prompt
+
+    from chimera_agent.prompts import AGENT_V2_DECISION_GUIDANCE, AGENT_V2_SYSTEM_PROMPT
+    return {"agent_v1": (build_system_prompt(), ""),
+            "agent_v2": (AGENT_V2_SYSTEM_PROMPT, AGENT_V2_DECISION_GUIDANCE)}[system]
+
+
+async def run_traced(cfg, case_dir: Path, baseline_dir: Path, system: str) -> None:
     from chimera_agent_baseline.case_loader import load_cases
     from chimera_agent_baseline.models import load_model
     from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -128,7 +136,8 @@ async def run_agent_v1(cfg, case_dir: Path, baseline_dir: Path) -> None:
         "env": {key: os.environ[key] for key in FORWARDED_ENV},
     }})
     tools = await client.get_tools()
-    trace = await run_case(load_model(cfg), tools, build_system_prompt(), query["case_id"], query["context"],
+    system_prompt, guidance = prompts_for(system)
+    trace = await run_case(load_model(cfg), tools, system, system_prompt, guidance, query["case_id"], query["context"],
                            cfg.agent.max_iterations)
     decision, reasoning = official_output(trace.decision, trace.tool_calls)
     output = case_dir / "work/output/task1" / query["case_id"]

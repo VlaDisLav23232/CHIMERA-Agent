@@ -79,7 +79,7 @@ class Trace(Strict):
 
     trace_schema: Literal["chimera_agent.trace/2"] = Field(TRACE_SCHEMA, alias="schema")
     case_id: str
-    system: Literal["agent_v1"] = "agent_v1"
+    system: Literal["agent_v1", "agent_v2"]
     evidence: list[EvidenceItem]
     tool_calls: list[ToolCallRecord]
     agent_message: str

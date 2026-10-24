@@ -46,7 +46,7 @@ def final_agent_text(messages: list) -> str:
     return ""
 
 
-def create_graph(model: BaseChatModel, tools: list[BaseTool], system_prompt: str, case_id: str):
+def create_graph(model: BaseChatModel, tools: list[BaseTool], system_prompt: str, decision_guidance: str, case_id: str):
     bound = model.bind_tools(tools)
 
     async def agent(state: State) -> dict[str, Any]:
@@ -61,7 +61,7 @@ def create_graph(model: BaseChatModel, tools: list[BaseTool], system_prompt: str
         items, calls = build_ledger(prompt, state["messages"])
         agent_message = final_agent_text(state["messages"])
         eligible = eligible_variables(1, revealed_tools(calls))
-        record, attempts, repairs = await decide(model, items, agent_message, eligible)
+        record, attempts, repairs = await decide(model, items, agent_message, eligible, decision_guidance)
         return {"evidence": items, "tool_calls": calls, "agent_message": agent_message, "decision": record,
                 "checks": run_checks(record, items, calls), "decision_attempts": attempts, "escape_repairs": repairs,
                 "decision_s": time.monotonic() - started}
@@ -78,12 +78,12 @@ def create_graph(model: BaseChatModel, tools: list[BaseTool], system_prompt: str
     return builder.compile()
 
 
-async def run_case(model: BaseChatModel, tools: list[BaseTool], system_prompt: str, case_id: str, context: str,
-                   max_iterations: int) -> Trace:
+async def run_case(model: BaseChatModel, tools: list[BaseTool], system: str, system_prompt: str, decision_guidance: str,
+                   case_id: str, context: str, max_iterations: int) -> Trace:
     started = time.monotonic()
-    graph = create_graph(model, tools, system_prompt, case_id)
+    graph = create_graph(model, tools, system_prompt, decision_guidance, case_id)
     state = await graph.ainvoke({"messages": [HumanMessage(content=context)]}, {"recursion_limit": max_iterations})
-    return Trace(case_id=case_id, evidence=state["evidence"], tool_calls=state["tool_calls"],
+    return Trace(case_id=case_id, system=system, evidence=state["evidence"], tool_calls=state["tool_calls"],
                  agent_message=state["agent_message"], decision=state["decision"], checks=state["checks"],
                  decision_attempts=state["decision_attempts"], escape_repairs=state["escape_repairs"],
                  llm_calls=state["agent_calls"] + state["decision_attempts"],

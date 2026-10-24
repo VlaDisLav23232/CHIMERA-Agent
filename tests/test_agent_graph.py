@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import unittest
 
@@ -7,9 +8,12 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import StructuredTool
+from pydantic import ValidationError
 
-from chimera_agent.decision import official_output, repair_apostrophes
+from chimera_agent.decision import SYSTEM_PROMPT, decision_prompt, official_output, repair_apostrophes
+from chimera_agent.evidence import EvidenceItem, Trace
 from chimera_agent.graph import run_case
+from chimera_agent.prompts import AGENT_V2_DECISION_GUIDANCE
 
 CONTEXT = "Case ID: c1\nPSA: 7.2 ng/mL\nPI-RADS score: 4"
 ELIGIBLE = [v for v, tool in VARIABLES_BY_TASK[1].items() if tool is None]
@@ -53,9 +57,10 @@ def make_tools(calls):
     return [StructuredTool.from_function(coroutine=get_mri_report)]
 
 
-def run(script, calls=None):
+def run(script, calls=None, system="agent_v1", guidance=""):
     model = ScriptedModel(script=script, prompts=[])
-    trace = asyncio.run(run_case(model, make_tools(calls if calls is not None else []), "system", "c1", CONTEXT, 25))
+    trace = asyncio.run(run_case(model, make_tools(calls if calls is not None else []), system, "system", guidance, "c1",
+                                 CONTEXT, 25))
     return trace, model
 
 
@@ -78,6 +83,20 @@ class GraphTest(unittest.TestCase):
         decision_prompt = model.prompts[-1][-1].content
         self.assertIn("[E1] get_mri_report (radiology_report)", decision_prompt)
         self.assertIn("Biopsy advised.", decision_prompt)
+
+    def test_trace_records_system_and_guidance_reaches_decision(self):
+        trace, model = run([AIMessage(content="Done."), form()], system="agent_v2", guidance=AGENT_V2_DECISION_GUIDANCE)
+        self.assertEqual(trace.system, "agent_v2")
+        self.assertIn(AGENT_V2_DECISION_GUIDANCE, model.prompts[-1][-1].content)
+
+    def test_trace_system_is_required(self):
+        trace, _ = run([AIMessage(content="Done."), form()])
+        written = json.loads(trace.model_dump_json(by_alias=True))
+        self.assertEqual((written["schema"], written["system"]), ("chimera_agent.trace/2", "agent_v1"))
+        Trace.model_validate(written)
+        del written["system"]
+        with self.assertRaises(ValidationError):
+            Trace.model_validate(written)
 
     def test_foreign_case_is_rejected_and_recorded(self):
         calls = []
@@ -120,3 +139,26 @@ class GraphTest(unittest.TestCase):
         extra = form(variable_weights={v: "not_used" for v in ELIGIBLE} | {"fh": "noted"})
         with self.assertRaises(RuntimeError):
             run([AIMessage(content="Done."), extra, extra, extra])
+
+
+ITEMS = [EvidenceItem(id="P", kind="prompt", tool=None, args={}, order=0, content=CONTEXT),
+         EvidenceItem(id="E1", kind="clinical", tool="get_mri_report", args={"case_id": "c1"}, order=1,
+                      section="radiology_report", content="PI-RADS 4, 14 mm lesion."),
+         EvidenceItem(id="G1", kind="guideline", tool="search_guidelines", args={"query": "q"}, order=2,
+                      section="5.4", page=30, score=0.8, content="Biopsy is recommended for PI-RADS >= 4.")]
+# SHA-256 of the agent_v1 decision messages for ITEMS, taken from the code that produced the agent_v1 dev run.
+AGENT_V1_DECISION_SHA256 = "bd30038cd9b023fb55f8430579726bf9b1bc4349d4cc888882a570e56b1c6cff"
+
+
+class DecisionPromptTest(unittest.TestCase):
+    def test_agent_v1_decision_prompt_is_unchanged(self):
+        text = SYSTEM_PROMPT + "\n\n" + decision_prompt(ITEMS, "Biopsy advised.", ELIGIBLE, "")
+        self.assertEqual(hashlib.sha256(text.encode()).hexdigest(), AGENT_V1_DECISION_SHA256)
+
+    def test_guidance_sits_between_analysis_and_form(self):
+        prompt = decision_prompt(ITEMS, "Biopsy advised.", ELIGIBLE, AGENT_V2_DECISION_GUIDANCE)
+        self.assertEqual(prompt.count(AGENT_V2_DECISION_GUIDANCE), 1)
+        self.assertLess(prompt.index('Biopsy advised.\n"""'), prompt.index(AGENT_V2_DECISION_GUIDANCE))
+        self.assertLess(prompt.index(AGENT_V2_DECISION_GUIDANCE), prompt.index("Fill in the form."))
+        self.assertEqual(prompt.replace(AGENT_V2_DECISION_GUIDANCE + "\n\n", ""),
+                         decision_prompt(ITEMS, "Biopsy advised.", ELIGIBLE, ""))

@@ -11,7 +11,7 @@ from chimera_agent.run import publish, run, run_worker
 READINESS = {"model_digest": "d", "context_length": 16384, "embedding_revision": "r", "retrieval_hits": 5}
 
 
-def write_outputs(case_dir: Path, case_id: str, reasoning: dict | None = None, trace: bool = False) -> None:
+def write_outputs(case_dir: Path, case_id: str, reasoning: dict | None = None, trace: str | None = None) -> None:
     from chimera_agent_baseline.output.schema import VARIABLES_BY_TASK
     case = case_dir / "work/output/task1" / case_id
     case.mkdir(parents=True)
@@ -31,7 +31,7 @@ def write_outputs(case_dir: Path, case_id: str, reasoning: dict | None = None, t
         decision = DecisionRecord(biopsy_decision=True, confidence="clear", variable_weights={},
                                   claims=[Claim(text="PI-RADS 4.", evidence=["P"])])
         (case_dir / "work/trace.json").write_text(Trace(
-            case_id=case_id, evidence=items, tool_calls=calls, agent_message="", decision=decision,
+            case_id=case_id, system=trace, evidence=items, tool_calls=calls, agent_message="", decision=decision,
             checks=run_checks(decision, items, calls), decision_attempts=1, escape_repairs=0, llm_calls=2,
             timings=Timings(agent_s=1, decision_s=1, total_s=2)).model_dump_json(by_alias=True))
 
@@ -64,7 +64,7 @@ class RunTest(unittest.TestCase):
             if case_dir.name in ("bad", "late"):
                 return {"bad": "failed", "late": "timed_out"}[case_dir.name]
             (case_dir / "readiness.json").write_text(json.dumps(READINESS))
-            write_outputs(case_dir, case_dir.name, trace=True)
+            write_outputs(case_dir, case_dir.name, trace="agent_v1")
             return "succeeded"
         with tempfile.TemporaryDirectory() as temp:
             directory, info = self.batch(Path(temp), "mixed", ["good", "bad", "late"], worker)
@@ -83,7 +83,8 @@ class RunTest(unittest.TestCase):
             case_dir.mkdir(parents=True, exist_ok=True)
             readiness = READINESS | ({"model_digest": "other"} if case_dir.name == "swapped" else {})
             (case_dir / "readiness.json").write_text(json.dumps(readiness))
-            write_outputs(case_dir, case_dir.name, reasoning={} if case_dir.name == "broken" else None, trace=True)
+            write_outputs(case_dir, case_dir.name, reasoning={} if case_dir.name == "broken" else None,
+                          trace="agent_v1")
             return "succeeded"
         with tempfile.TemporaryDirectory() as temp:
             directory, info = self.batch(Path(temp), "checks", ["good", "broken", "swapped"], worker)
@@ -108,11 +109,35 @@ class RunTest(unittest.TestCase):
     def test_publish_rejects_trace_of_another_case(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
-            write_outputs(directory / "case", "dev", trace=True)
+            write_outputs(directory / "case", "dev", trace="agent_v1")
             trace = json.loads((directory / "case/work/trace.json").read_text())
             (directory / "case/work/trace.json").write_text(json.dumps(trace | {"case_id": "other"}))
             with self.assertRaisesRegex(ValueError, "another case"):
                 publish(directory / "case", directory, "dev", "agent_v1")
+            self.assertFalse((directory / "output").exists())
+
+    def test_agent_v2_run_is_recorded_with_its_traces(self):
+        def worker(command, log, seconds):
+            case_dir = Path(command[3])
+            case_dir.mkdir(parents=True, exist_ok=True)
+            if case_dir.name == "bad":
+                return "failed"
+            (case_dir / "readiness.json").write_text(json.dumps(READINESS))
+            write_outputs(case_dir, case_dir.name, trace="agent_v2")
+            return "succeeded"
+        with tempfile.TemporaryDirectory() as temp:
+            directory, info = self.batch(Path(temp), "v2", ["good", "bad"], worker, system="agent_v2")
+            self.assertEqual(info["system"], "agent_v2")
+            self.assertEqual(sorted(p.name for p in (directory / "trace").iterdir()), ["good.json"])
+            trace = json.loads((directory / "trace/good.json").read_text())
+            self.assertEqual(trace["system"], "agent_v2")
+
+    def test_publish_rejects_trace_of_another_system(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            write_outputs(directory / "case", "dev", trace="agent_v1")
+            with self.assertRaisesRegex(ValueError, "another system"):
+                publish(directory / "case", directory, "dev", "agent_v2")
             self.assertFalse((directory / "output").exists())
 
     def test_invalid_run_name_and_system_rejected(self):

@@ -13,7 +13,9 @@ from pathlib import Path
 from chimera_agent.config import BASELINE_COMMIT, ROOT, Settings, config_id, load_settings
 from chimera_agent.inputs import select_cases, stage_case
 
-SYSTEMS = ("baseline_scaffold", "agent_v1")
+SYSTEMS = ("baseline_scaffold", "agent_v1", "agent_v2")
+# Systems that run our graph and write a trace per case.
+TRACED = ("agent_v1", "agent_v2")
 # Readiness fields that must agree across the cases of one run.
 READINESS_IDENTITY = ("model_digest", "context_length", "embedding_revision")
 
@@ -78,14 +80,16 @@ def publish(case_dir: Path, run_dir: Path, case_id: str, system: str) -> None:
         "confidence": reasoning["confidence"], "variable_weights": reasoning["variable_weights"],
         "reasoning": reasoning["free_text"], "reveal_sequence": reasoning["reveal_sequence"],
     })
-    if system == "agent_v1":
+    if system in TRACED:
         trace = Trace.model_validate_json((case_dir / "work/trace.json").read_text())
         if trace.case_id != case_id:
             raise ValueError("Trace belongs to another case")
+        if trace.system != system:
+            raise ValueError("Trace belongs to another system")
     # Everything is validated above; the official files move first so a trace is never published without them.
     (run_dir / "output/task1").mkdir(parents=True, exist_ok=True)
     case.rename(run_dir / "output/task1" / case_id)
-    if system == "agent_v1":
+    if system in TRACED:
         (run_dir / "trace").mkdir(exist_ok=True)
         (case_dir / "work/trace.json").rename(run_dir / "trace" / f"{case_id}.json")
 
@@ -165,7 +169,7 @@ def run(settings: Settings, name: str, system: str, cases: list[str]) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run dev cases with the unchanged baseline or agent_v1")
+    parser = argparse.ArgumentParser(description="Run dev cases with the unchanged baseline, agent_v1 or agent_v2")
     parser.add_argument("--name", required=True)
     parser.add_argument("--system", required=True, choices=SYSTEMS)
     parser.add_argument("--case", action="append", default=[], help="dev case ID; repeat for several")
