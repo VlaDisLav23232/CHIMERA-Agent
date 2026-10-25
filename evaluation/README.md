@@ -21,6 +21,20 @@ python -m evaluation.leaderboard
 
 `score` options: `--split dev|test|all` (default `dev`; `test` and `all` need `--confirm-test`), `--seed N`, `--judge` (needs Ollama with `gemma4:e4b`; another model via `JUDGE_MODEL` is marked unofficial). `leaderboard` options: `--split`, `--judge`, `--reference <run>` (default: the only `baseline` run).
 
+## Claim audit
+
+A manual check of explanation claims on a fixed set of 10 dev cases (`splits/audit_task1.json`), for the baseline and an agent run:
+
+```
+python -m evaluation.audit sheet results/baseline_run results/<agent_run>   # blinded sheets in results/audit/ (local)
+python -m evaluation.audit summary                                           # unsupported-claim share per system, agreement, kappa
+python -m evaluation.audit checks results/<agent_run>                        # aggregate of the automatic trace checks
+```
+
+Each `free_text` is split into sentences with the same rule for both systems. The rows are shuffled and the system is hidden.
+Each annotator labels every row `supported` or `unsupported` against the case's input files, without opening `key.csv`.
+Disagreements go into `results/audit/agreed.csv` (`row_id,label`).
+
 ## Outputs
 
 - `results/summaries/<run>.md|json`: run settings and aggregate metrics (committed).

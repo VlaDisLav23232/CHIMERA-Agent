@@ -1,0 +1,122 @@
+{
+ "name": "agent_v1_dev",
+ "system": "agent_v1",
+ "model": "gemma4:e2b-it-q8_0",
+ "code_commit": "c32912f0d8e13216a33b5bb1e268bf915bf855f8",
+ "baseline_commit": "1afa788efc21c0e0144706d75170b0a4cd267367",
+ "config_id": "4e7256b681fa37974a02255e34d1915c6e9db9844f6c8733b9ed92b6be3a7e4d",
+ "temperature": 1.0,
+ "seed": null,
+ "split": "dev",
+ "judge": "none",
+ "evaluator_commit": "92365b9",
+ "date": "2026-10-24",
+ "run_dir": "results\\agent_v1_dev",
+ "metrics": {
+  "task1_score": 0.6515633642977392,
+  "task1_score_ci": [
+   0.5572021159314459,
+   0.738017969811651
+  ],
+  "mean_case_score": 0.5119179373866873,
+  "f1_yes_ci": [
+   0.691358024691358,
+   0.875
+  ],
+  "components": {
+   "confidence_score": 0.775,
+   "variable_weight_score": 0.7508333333333334,
+   "important_decisive_factor_score": 0.6102589077589078,
+   "tool_score": 0.8983333333333333,
+   "section_grounding_score": 0.8312996031746032,
+   "rationale_score": null
+  },
+  "clinical": {
+   "n": 60,
+   "tp": 36,
+   "fp": 19,
+   "tn": 4,
+   "fn": 1,
+   "invalid": 2,
+   "accuracy": 0.6666666666666666,
+   "f1_yes": 0.7912087912087912,
+   "sensitivity": 0.972972972972973,
+   "specificity": 0.17391304347826086,
+   "ppv": 0.6666666666666666,
+   "npv": 1.0
+  },
+  "by_prior_biopsy": {
+   "Negative": {
+    "n": 12,
+    "tp": 9,
+    "fp": 3,
+    "tn": 0,
+    "fn": 0,
+    "invalid": 1,
+    "accuracy": 0.75,
+    "f1_yes": 0.9,
+    "sensitivity": 1.0,
+    "specificity": 0.0,
+    "ppv": 0.8181818181818182,
+    "npv": null
+   },
+   "None": {
+    "n": 16,
+    "tp": 12,
+    "fp": 1,
+    "tn": 2,
+    "fn": 1,
+    "invalid": 1,
+    "accuracy": 0.875,
+    "f1_yes": 0.9230769230769231,
+    "sensitivity": 0.9230769230769231,
+    "specificity": 0.6666666666666666,
+    "ppv": 0.9230769230769231,
+    "npv": 1.0
+   },
+   "Positive": {
+    "n": 32,
+    "tp": 15,
+    "fp": 15,
+    "tn": 2,
+    "fn": 0,
+    "invalid": 0,
+    "accuracy": 0.53125,
+    "f1_yes": 0.6666666666666666,
+    "sensitivity": 1.0,
+    "specificity": 0.11764705882352941,
+    "ppv": 0.5,
+    "npv": 1.0
+   }
+  },
+  "confidence": {
+   "by_level": {
+    "clear": {
+     "n": 57,
+     "accuracy": 0.7017543859649122
+    },
+    "borderline": {
+     "n": 1,
+     "accuracy": 0.0
+    },
+    "uncertain": {
+     "n": 0,
+     "accuracy": null
+    }
+   },
+   "agreement_with_reference": 0.6166666666666667
+  },
+  "tools": {
+   "tools_per_case": 1.9333333333333333,
+   "reference_tools_per_case": 3.1,
+   "share_of_cases": {
+    "radiology_report": 0.9666666666666667,
+    "psa_trend": 0.5833333333333334,
+    "laboratory_results": 0.25,
+    "previous_notes": 0.1,
+    "family_history": 0.03333333333333333
+   },
+   "recall_of_reference": 0.5607344632768362
+  }
+ }
+}
