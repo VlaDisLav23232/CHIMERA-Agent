@@ -37,6 +37,11 @@ class PromptsForTest(unittest.TestCase):
     def test_agent_v2_gets_our_prompts(self):
         self.assertEqual(prompts_for("agent_v2"), (AGENT_V2_SYSTEM_PROMPT, AGENT_V2_DECISION_GUIDANCE))
 
+    def test_ablations_keep_agent_v3_prompts_except_without_the_fetch(self):
+        self.assertEqual(prompts_for("agent_v3_model_decides"), prompts_for("agent_v3"))
+        self.assertEqual(prompts_for("agent_v3_model_rates"), prompts_for("agent_v3"))
+        self.assertEqual(prompts_for("agent_v3_agent_fetches"), (AGENT_V2_SYSTEM_PROMPT, ""))
+
     def test_agent_v3_prompt_offers_only_guideline_search(self):
         system_prompt, guidance = prompts_for("agent_v3")
         self.assertEqual((set(re.findall(r"`(\w+)`", system_prompt)), guidance), ({"search_guidelines"}, ""))

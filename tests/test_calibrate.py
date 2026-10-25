@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 
 from evaluation.calibrate import VARIABLES, fit, upper_median
 
@@ -37,3 +38,14 @@ class VariantTest(unittest.TestCase):
         self.assertEqual(v3.calibration.fitted_on, "dev")
         self.assertIsNone(variant_for("agent_v3", {"pirads": "NA", "psad": 0.25}).gate)
         self.assertIsNone(variant_for("agent_v2", {"pirads": "5", "psad": 0.25}).gate)
+
+    def test_each_ablation_removes_one_part(self):
+        from chimera_agent.graph import PLAIN
+        from chimera_agent.worker import variant_for
+        card = {"pirads": "5", "psad": 0.3}
+        full = variant_for("agent_v3", card)
+        self.assertEqual(variant_for("agent_v3_model_decides", card), replace(full, gate=None))
+        self.assertEqual(variant_for("agent_v3_model_rates", card), replace(full, calibration=None))
+        self.assertEqual(variant_for("agent_v3_agent_fetches", card),
+                         replace(full, mandatory_tools=(), agent_tools=None))
+        self.assertEqual(variant_for("agent_v1", card), PLAIN)

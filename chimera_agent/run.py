@@ -13,9 +13,11 @@ from pathlib import Path
 from chimera_agent.config import BASELINE_COMMIT, ROOT, Settings, config_id, load_settings
 from chimera_agent.inputs import select_cases, stage_case
 
-SYSTEMS = ("baseline_scaffold", "agent_v1", "agent_v2", "agent_v3")
+# agent_v3_* are ablations of agent_v3, each without one of its parts (worker.variant_for).
+ABLATIONS = ("agent_v3_model_decides", "agent_v3_model_rates", "agent_v3_agent_fetches")
+SYSTEMS = ("baseline_scaffold", "agent_v1", "agent_v2", "agent_v3", *ABLATIONS)
 # Systems that run our graph and write a trace per case.
-TRACED = ("agent_v1", "agent_v2", "agent_v3")
+TRACED = ("agent_v1", "agent_v2", "agent_v3", *ABLATIONS)
 # Readiness fields that must agree across the cases of one run.
 READINESS_IDENTITY = ("model_digest", "context_length", "embedding_revision")
 

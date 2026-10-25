@@ -120,17 +120,25 @@ def prompts_for(system: str) -> tuple[str, str]:
     from chimera_agent.prompts import AGENT_V2_DECISION_GUIDANCE, AGENT_V2_SYSTEM_PROMPT, AGENT_V3_SYSTEM_PROMPT
     return {"agent_v1": (build_system_prompt(), ""),
             "agent_v2": (AGENT_V2_SYSTEM_PROMPT, AGENT_V2_DECISION_GUIDANCE),
-            "agent_v3": (AGENT_V3_SYSTEM_PROMPT, "")}[system]
+            "agent_v3": (AGENT_V3_SYSTEM_PROMPT, ""),
+            "agent_v3_model_decides": (AGENT_V3_SYSTEM_PROMPT, ""),
+            "agent_v3_model_rates": (AGENT_V3_SYSTEM_PROMPT, ""),
+            # Without the fetch the agent must choose its documents, so it gets the prompt that lists the tools.
+            "agent_v3_agent_fetches": (AGENT_V2_SYSTEM_PROMPT, "")}[system]
 
 
 def variant_for(system: str, card: dict):
-    # card is the case's structured-prompt.json, an agent input.
+    # card is the case's structured-prompt.json, an agent input. Each agent_v3_* ablation removes one of agent_v3's
+    # three parts: the decision policy, the calibrated confidence and weights, or the fixed document retrieval.
     from chimera_agent.decision import eau_policy, load_calibration
     from chimera_agent.graph import PLAIN, Variant
-    if system == "agent_v3":
-        return Variant(gate=eau_policy(card["pirads"], card["psad"]), grounded_only=True, mandatory_tools=FETCHED,
-                       agent_tools=("search_guidelines",), calibration=load_calibration(CALIBRATION))
-    return PLAIN
+    if not system.startswith("agent_v3"):
+        return PLAIN
+    fetches = system != "agent_v3_agent_fetches"
+    return Variant(gate=None if system == "agent_v3_model_decides" else eau_policy(card["pirads"], card["psad"]),
+                   grounded_only=True, mandatory_tools=FETCHED if fetches else (),
+                   agent_tools=("search_guidelines",) if fetches else None,
+                   calibration=None if system == "agent_v3_model_rates" else load_calibration(CALIBRATION))
 
 
 async def run_traced(cfg, case_dir: Path, baseline_dir: Path, system: str) -> None:

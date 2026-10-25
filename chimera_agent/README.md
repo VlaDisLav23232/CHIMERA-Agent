@@ -21,6 +21,10 @@ Runs cases through one of four systems:
   `python -m evaluation.calibrate`; a variable whose source section was not revealed
   is `not_used`, as the official section grounding counts it. The model writes the
   cited claims.
+- Ablations of agent_v3, each without one part: `agent_v3_model_decides` (no policy:
+  the model decides), `agent_v3_model_rates` (no calibration: the model gives the
+  confidence and weights), `agent_v3_agent_fetches` (no fixed retrieval: the agent
+  chooses its tools, with the agent_v2 prompt).
 
 Our code adds safe input preparation, explicit settings, readiness checks, a
 per-case time limit, batch runs and run metadata.
