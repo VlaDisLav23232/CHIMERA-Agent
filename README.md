@@ -39,12 +39,14 @@ supplied EAU guideline index.
 | baseline | 0.662 (0.571–0.746) | 0.804 | 0.217 | 0 |
 | agent_v1 | 0.669 (0.575–0.750) | 0.809 | 0.261 | 2 |
 | agent_v2 | 0.660 (0.564–0.745) | 0.795 | 0.304 | 0 |
+| agent_v3 | 0.707 (0.614–0.790) | 0.818 | 0.348 | 0 |
 
-- **No system is distinguishable from the baseline.** Paired differences are within ±0.01, with 95% CIs spanning zero. Two runs of the same system already differ in about 6 of 60 decisions.
+- **agent_v3 is the best system on dev, but not yet significantly better than the baseline.** Paired difference +0.044 (95% CI −0.002…+0.091). Its calibration was fitted on dev, so the held-out test split decides. An ablation without the EAU policy scores 0.705: the gain comes from the fixed evidence and the calibrated reasoning fields, not from different decisions.
+- **agent_v1 and agent_v2 are not distinguishable from the baseline.** Paired differences are within ±0.01, with 95% CIs spanning zero. Two runs of the same system already differ in about 6 of 60 decisions.
 - **agent_v1's explanations can be checked.** All its cited evidence IDs exist, and 86.5% of its claims contain only numbers found in the cited evidence. The baseline's explanation cites nothing. Whether this means fewer unsupported claims is being measured by a manual audit.
 - **agent_v2 is a negative result.** The agent now reads the previous notes in 92% of cases, against 15% before. But it still recommends a biopsy for most patients with a prior positive biopsy where the reference says no: it treats a high PI-RADS score as "progression".
 
-Details: [results/agent_v1.md](results/agent_v1.md), [results/agent_v2.md](results/agent_v2.md),
+Details: [results/agent_v1.md](results/agent_v1.md), [results/agent_v2.md](results/agent_v2.md), [results/agent_v3.md](results/agent_v3.md),
 [results/baseline.md](results/baseline.md), and the [leaderboard](results/summaries/leaderboard_dev.md). The test
 split (31 cases) has not been run yet.
 
