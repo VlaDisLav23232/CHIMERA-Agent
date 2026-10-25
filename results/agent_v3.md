@@ -1,8 +1,10 @@
 # agent_v3 results (Task 1, dev split)
 
 agent_v3 adds three parts to the agent_v1 graph. The MRI report, PSA trend and previous notes are always retrieved
-through the MCP tools before the agent runs, and the agent may then only search the guidelines. An EAU policy decides:
-PI-RADS 4-5 biopsy, 1-2 none, 3 by PSA density > 0.20, and the model decides only when PI-RADS is missing. The
+through the MCP tools before the agent runs, and the agent may then only search the guidelines. A PI-RADS rule decides:
+PI-RADS 4-5 biopsy, 1-2 none, 3 biopsy if PSA density > 0.20, and the model decides only when PI-RADS is missing.
+The 0.20 threshold is the highest PSA-density band of the EAU 2026 risk table and was chosen on dev; the EAU
+recommendation itself omits a biopsy at PI-RADS 3 only below 0.10. The
 confidence and variable weights come from a table fitted on the dev references (`configs/calibration_task1.json`,
 `python -m evaluation.calibrate`); a weight is kept only for a variable whose source document was opened. The model
 writes 2-4 claims that cite evidence IDs.
@@ -15,7 +17,7 @@ Commit `ca6a05a`. Deterministic official scoring (evaluator `92365b9`, no LLM ju
 | Run | System | Cases succeeded | Median time per case |
 |---|---|---|---|
 | `agent_v3_dev` | agent_v3 | 60/60 | 65 s |
-| `agent_v3_model_decides_dev` | ablation: no EAU policy, the model decides | 60/60 | 62 s |
+| `agent_v3_model_decides_dev` | ablation: no decision rule, the model decides | 60/60 | 62 s |
 
 ## Decision quality
 
@@ -30,7 +32,7 @@ Commit `ca6a05a`. Deterministic official scoring (evaluator `92365b9`, no LLM ju
 | Invalid outputs | 0 | 2 | 0 | 0 | 0 |
 
 - agent_v3 − agent_v2: +0.047 (+0.019…+0.086).
-- agent_v3 − model decides: +0.002 (−0.044…+0.047); the two differ in 4 decisions. The EAU policy adds nothing
+- agent_v3 − model decides: +0.002 (−0.044…+0.047); the two differ in 4 decisions. The decision rule adds nothing
   measurable; the gain over the baseline comes from the reasoning fields.
 - agent_v3's decisions differ from the baseline's only at PI-RADS 3 (4 cases): 3 became correct, 1 wrong.
 - By prior biopsy: accuracy None 1.000 (16 cases), Negative 0.917 (12), Positive 0.531 (32), as for every system.

@@ -15,7 +15,7 @@ Runs cases through one of four systems:
 - `agent_v3`: the agent_v1 graph with what the strongest challenge entries do. The MRI
   report, PSA trend and previous notes are retrieved through the tools before the agent
   runs, and the agent (own prompt in prompts.py) is then offered only `search_guidelines`.
-  The decision follows an EAU policy (PI-RADS 4-5: biopsy; 1-2: none; 3: biopsy if PSA
+  The decision follows a PI-RADS rule (PI-RADS 4-5: biopsy; 1-2: none; 3: biopsy if PSA
   density > 0.20; NA: the model decides). Confidence and weights come from
   configs/calibration_task1.json, fitted on the dev references by
   `python -m evaluation.calibrate`; a variable whose source section was not revealed

@@ -18,7 +18,8 @@ MIN_FREE_TEXT = 40
 # Gemma writes escapes JSON does not have, such as \' inside strings. An unescaped backslash before any character
 # other than a valid JSON escape is dropped, and every repair is counted in the trace.
 INVALID_ESCAPE = re.compile(r'(?<!\\)((?:\\\\)*)\\([^"\\/bfnrtu])')
-# EAU: at PI-RADS 3 a PSA density at or below 0.20 ng/mL² allows the biopsy to be omitted.
+# At PI-RADS 3 the biopsy follows PSA density above 0.20 ng/mL², the highest band of the EAU 2026 risk table
+# (Table 5.5). The EAU recommendation itself omits the biopsy at PI-RADS 3 only below 0.10; 0.20 was chosen on dev.
 PSAD_PIRADS3 = 0.20
 
 SYSTEM_PROMPT = (

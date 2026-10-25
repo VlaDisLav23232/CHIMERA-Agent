@@ -59,7 +59,7 @@ current plan of a patient with a known cancer is not documented.
 Choose the level from these definitions."""
 
 # agent_v3: the MRI report, PSA history and previous notes are retrieved before the agent runs (the documents the
-# reference urologists opened in most cases), the decision follows the EAU policy in decision.eau_policy, and the
+# reference urologists opened in most cases), the decision follows the PI-RADS rule in decision.eau_policy, and the
 # agent's analysis feeds the cited claims.
 AGENT_V3_SYSTEM_PROMPT = """\
 You are a clinical decision-support agent for prostate cancer diagnostics. The question for this patient is \
