@@ -1,8 +1,40 @@
-# Local Task 1 scaffold
+# Task 1 agent
 
-Runs one development case through the organizers' unchanged agent. Our code adds
-safe input preparation, explicit local settings, readiness checks, a time limit
-and run metadata. Graph changes are a later work item.
+Runs cases through one of four systems:
+
+- `baseline_scaffold`: the organizers' unchanged graph, as in the baseline run.
+- `agent_v1`: our graph. It keeps the baseline's ReAct loop, tools, prompts and
+  model, and replaces the final form-filling step. The decision step sees every
+  retrieved document and guideline passage under an ID (`P`, `E1…`, `G1…`), writes
+  2-4 claims that cite those IDs, and records citation, number and weight checks
+  in a per-case trace.
+- `agent_v2`: the agent_v1 graph with our own prompts (prompts.py). The agent's
+  system prompt lists only the Task 1 tools and explains what a prior positive
+  biopsy means for a new biopsy decision; the decision step also gets that framing
+  and definitions of the three confidence levels. Everything else is as in agent_v1.
+- `agent_v3`: the agent_v1 graph with what the strongest challenge entries do. The MRI
+  report, PSA trend and previous notes are retrieved through the tools before the agent
+  runs, and the agent (own prompt in prompts.py) is then offered only `search_guidelines`.
+  The decision follows an EAU policy (PI-RADS 4-5: biopsy; 1-2: none; 3: biopsy if PSA
+  density > 0.20; NA: the model decides). Confidence and weights come from
+  configs/calibration_task1.json, fitted on the dev references by
+  `python -m evaluation.calibrate`; a variable whose source section was not revealed
+  is `not_used`, as the official section grounding counts it. The model writes the
+  cited claims.
+- Ablations of agent_v3, each without one part: `agent_v3_model_decides` (no policy:
+  the model decides), `agent_v3_model_rates` (no calibration: the model gives the
+  confidence and weights), `agent_v3_agent_fetches` (no fixed retrieval: the agent
+  chooses its tools, with the agent_v2 prompt).
+
+Our code adds safe input preparation, explicit settings, readiness checks, a
+per-case time limit, batch runs and run metadata.
+
+Runs need Linux, macOS or WSL: the runner stops process groups with `os.killpg`
+and the baseline's guideline search talks to its embedding service over a Unix
+socket. Full runs are done on Kaggle with
+[notebooks/02_agent_v1_run.ipynb](../notebooks/02_agent_v1_run.ipynb) (agent_v1),
+[notebooks/03_agent_v2_run.ipynb](../notebooks/03_agent_v2_run.ipynb) (agent_v2) and
+[notebooks/04_agent_v3_run.ipynb](../notebooks/04_agent_v3_run.ipynb) (agent_v3, dev or test).
 
 ## Setup
 
@@ -36,50 +68,70 @@ The optional evaluator judge model is not part of scaffold setup.
 
 ## Run
 
-    .venv/bin/python -m chimera_agent.run --name scaffold_smoke
+    .venv/bin/python -m chimera_agent.run --name smoke_01 --system agent_v1
 
-By default, selects the first sorted dev case from splits/task1.json.
-Use --case <dev-case-id> to select another. Test IDs are rejected.
+`--system` is required (`agent_v1`, `agent_v2`, `agent_v3` or `baseline_scaffold`). Without case
+options the first sorted dev case from splits/task1.json runs. Repeat `--case <dev-case-id>`
+for several cases, or use `--all-dev` for the whole dev split. Test IDs are rejected by `--case`;
+`--all-test` runs the whole test split and is meant for final comparisons only.
 Use --config <json-path> for explicit settings; defaults are in configs/agent.json.
 The endpoint must be local and the model must match the baseline.
 Run names cannot be reused; choose a new name for a retry.
 
-The 600-second limit covers readiness, model warmup and case execution, excluding
-downloads. A missing asset, failed guideline query or wrong context setting
-fails explicitly. If an existing Ollama server has another context setting,
-restart it yourself using the documented command; the runner does not reconfigure it.
+Each case runs in its own worker process. `wall_seconds` (at most 600) is the
+limit per case and covers readiness, model warmup and case execution, excluding
+downloads. A failed or timed-out case is recorded and the run moves on to the next
+one. The run status is `succeeded` (all cases), `partial` or `failed` (none); the
+command exits non-zero unless every case succeeded. A missing asset, failed
+guideline query or wrong context setting fails the case explicitly. If an existing
+Ollama server has another context setting, restart it yourself using the
+documented command; the runner does not reconfigure it.
+
+### WSL
+
+On Windows, install a distribution (`wsl --install -d Ubuntu`), clone the repository
+inside it (not under /mnt/c) and follow Setup there with Ollama installed inside WSL.
+WSL gets half of the machine's memory by default; raise it with `memory=12GB` under
+`[wsl2]` in `%UserProfile%\.wslconfig`, then `wsl --shutdown`.
 
 ## Outputs
 
-All run files are local under results/<name>/:
+All run files are local under results/<name>/ and may contain patient information:
 
-- resources/: per-run index copy, so Chroma metadata writes leave the checkout unchanged.
-- input/: allowlisted copies of dev inputs, with no reference answers.
-- output/task1/<case>/: two official JSON files, published only on success.
-- run_info.json: status, effective settings, code/model identity and elapsed time.
-- worker.log: diagnostics, potentially containing patient information.
-- work/: partial outputs retained locally if a run fails.
+- resources/: one index copy per run, so Chroma metadata writes leave the checkout unchanged.
+- cases/<case>/input/: allowlisted copies of that case's inputs, with no reference answers.
+- cases/<case>/worker.log: diagnostics.
+- cases/<case>/work/: partial outputs kept if the case fails.
+- output/task1/<case>/: the two official JSON files, published per case only on success.
+- trace/<case>.json: agent_v1-v3, the system name, the decision rule and whether the confidence
+  and weights are calibrated (agent_v3), the evidence
+  items, tool calls, claims with citations, check results, timings and LLM call count
+  (`schema: chimera_agent.trace/3`, defined in evidence.py).
+- run_info.json: run and per-case status, effective settings, code/model identity and timing.
 
 No output files are fabricated after an error. Staging is a filename allowlist,
 not a security sandbox. Patient source files are treated as data.
 
-After a successful run, evaluate it separately:
+After a run, evaluate it separately:
 
-    .venv/bin/python -m evaluation.score results/scaffold_smoke --name scaffold_smoke_dev --system baseline_scaffold --temperature 1.0
+    .venv/bin/python -m evaluation.score results/agent_v1_dev --name agent_v1_dev --system agent_v1 --temperature 1.0
 
-That scores all 60 dev cases: 59 unrun cases count as failures. Use this only to
-check file compatibility; it is not an agent performance result. Avoid registering
-partial smoke runs in the shared leaderboard. Use the full dev run later.
+Scoring always covers the whole split: unrun cases count as failures. A run with
+fewer cases checks file compatibility only and is not an agent performance result;
+keep such runs out of the shared leaderboard.
 
 ## Architecture and checks
 
-run.py owns staging, process supervision, metadata and success-only publication.
-worker.py integrates the pinned baseline and manages the embedding service.
-config.py and inputs.py contain settings and input preparation. Inference does
+run.py owns the batch, staging, process supervision, metadata and success-only publication.
+worker.py integrates the pinned baseline, manages the embedding service and runs
+the chosen system. graph.py is our graph, decision.py its decision step,
+prompts.py the agent_v2 and agent_v3 prompts, evidence.py the evidence ledger, checks and trace
+schema. config.py and inputs.py contain settings and input preparation. Inference does
 not import the evaluator, which alone has access to reference answers.
 
     .venv/bin/python -m unittest discover -s tests -t .
 
 Synthetic tests cover label isolation, wrong IDs, symlinks, settings, process
-failure/timeouts, output publication and experiment identity. A real single-case
-run additionally needs model access, enough memory and a working local server.
+failure/timeouts, batch statuses, output publication, experiment identity, the
+evidence ledger and checks, and the graph with a scripted model. A real run
+additionally needs model access, enough memory and a working local server.

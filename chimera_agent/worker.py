@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -9,7 +8,14 @@ from pathlib import Path
 
 import requests
 
-from chimera_agent.config import BASELINE_COMMIT, Settings
+from chimera_agent.config import BASELINE_COMMIT, ROOT, Settings
+
+# The MCP client starts tool servers with only a minimal default environment; these must reach them.
+FORWARDED_ENV = ("CHIMERA_EMBED_SOCKET", "ANONYMIZED_TELEMETRY", "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE",
+                 "PYTHONDONTWRITEBYTECODE")
+# Fitted on the dev references only (evaluation/calibrate.py); agent_v3 takes its confidence and weights from it.
+CALIBRATION = ROOT / "configs/calibration_task1.json"
+FETCHED = ("get_mri_report", "get_psa_trend", "get_previous_notes")
 
 
 def git_output(path: Path, *args: str) -> str:
@@ -52,7 +58,7 @@ def check_assets(settings: Settings) -> dict:
     return {"model_digest": digest, "context_length": model["context_length"]}
 
 
-def execute(run_dir: Path, settings: Settings) -> None:
+def execute(case_dir: Path, settings: Settings, system: str, resource_dir: Path) -> None:
     identity = check_assets(settings)
     embedding_config = json.loads((settings.embedding_dir / "config.json").read_text())
     identity["embedding_revision"] = embedding_config.get("_commit_hash", "unknown")
@@ -74,11 +80,8 @@ def execute(run_dir: Path, settings: Settings) -> None:
         raise ValueError("Installed baseline does not resolve to the pinned checkout")
     os.chdir(settings.baseline_dir)
     cfg = OmegaConf.load(settings.baseline_dir / "configs/config.yaml")
-    cfg.paths.data_root = str(run_dir / "input")
-    cfg.paths.output_dir = str(run_dir / "work/output")
-    resource_dir = run_dir / "resources"
-    # Chroma writes runtime SQLite metadata even for retrieval-only queries.
-    shutil.copytree(settings.baseline_dir / "resources", resource_dir)
+    cfg.paths.data_root = str(case_dir / "input")
+    cfg.paths.output_dir = str(case_dir / "work/output")
     cfg.paths.resource_dir = str(resource_dir)
     cfg.paths.embedding_model_dir = str(settings.embedding_dir)
     cfg.agent.tasks = [1]
@@ -101,17 +104,77 @@ def execute(run_dir: Path, settings: Settings) -> None:
         if not hits or not all(h.get("text") and isinstance(h.get("score"), (int, float)) for h in hits):
             raise RuntimeError("Guideline retrieval returned no real passages")
         identity["retrieval_hits"] = len(hits)
-        (run_dir / "readiness.json").write_text(json.dumps(identity, indent=2))
-        awaitable = run_agent(cfg)
-        asyncio.run(awaitable)
+        (case_dir / "readiness.json").write_text(json.dumps(identity, indent=2))
+        if system == "baseline_scaffold":
+            asyncio.run(run_agent(cfg))
+        else:
+            asyncio.run(run_traced(cfg, case_dir, settings.baseline_dir, system))
     finally:
         service.stop()
 
 
+def prompts_for(system: str) -> tuple[str, str]:
+    # The agent system prompt and the decision guidance.
+    from chimera_agent_baseline.agent.prompts import build_system_prompt
+
+    from chimera_agent.prompts import AGENT_V2_DECISION_GUIDANCE, AGENT_V2_SYSTEM_PROMPT, AGENT_V3_SYSTEM_PROMPT
+    return {"agent_v1": (build_system_prompt(), ""),
+            "agent_v2": (AGENT_V2_SYSTEM_PROMPT, AGENT_V2_DECISION_GUIDANCE),
+            "agent_v3": (AGENT_V3_SYSTEM_PROMPT, ""),
+            "agent_v3_model_decides": (AGENT_V3_SYSTEM_PROMPT, ""),
+            "agent_v3_model_rates": (AGENT_V3_SYSTEM_PROMPT, ""),
+            # Without the fetch the agent must choose its documents, so it gets the prompt that lists the tools.
+            "agent_v3_agent_fetches": (AGENT_V2_SYSTEM_PROMPT, "")}[system]
+
+
+def variant_for(system: str, card: dict):
+    # card is the case's structured-prompt.json, an agent input. Each agent_v3_* ablation removes one of agent_v3's
+    # three parts: the decision policy, the calibrated confidence and weights, or the fixed document retrieval.
+    from chimera_agent.decision import eau_policy, load_calibration
+    from chimera_agent.graph import PLAIN, Variant
+    if not system.startswith("agent_v3"):
+        return PLAIN
+    fetches = system != "agent_v3_agent_fetches"
+    return Variant(gate=None if system == "agent_v3_model_decides" else eau_policy(card["pirads"], card["psad"]),
+                   grounded_only=True, mandatory_tools=FETCHED if fetches else (),
+                   agent_tools=("search_guidelines",) if fetches else None,
+                   calibration=None if system == "agent_v3_model_rates" else load_calibration(CALIBRATION))
+
+
+async def run_traced(cfg, case_dir: Path, baseline_dir: Path, system: str) -> None:
+    from chimera_agent_baseline.case_loader import load_cases
+    from chimera_agent_baseline.models import load_model
+    from langchain_mcp_adapters.client import MultiServerMCPClient
+
+    from chimera_agent.decision import official_output
+    from chimera_agent.graph import run_case
+    from chimera_agent.inputs import PROMPT
+
+    input_dir = case_dir / "input/task1/agent_input"
+    (query,) = load_cases(input_dir, task=1, templates_dir=baseline_dir / "templates/prompts")
+    client = MultiServerMCPClient({"chimera": {
+        "command": sys.executable, "transport": "stdio",
+        "args": ["-m", "chimera_agent_baseline.mcp_server", "--data-dir", str(input_dir),
+                 "--resource-dir", cfg.paths.resource_dir, "--tool-registry", "task1"],
+        "env": {key: os.environ[key] for key in FORWARDED_ENV},
+    }})
+    tools = await client.get_tools()
+    system_prompt, guidance = prompts_for(system)
+    variant = variant_for(system, json.loads((input_dir / query["case_id"] / PROMPT).read_text()))
+    trace = await run_case(load_model(cfg), tools, system, system_prompt, guidance, query["case_id"], query["context"],
+                           cfg.agent.max_iterations, variant)
+    decision, reasoning = official_output(trace.decision, trace.tool_calls)
+    output = case_dir / "work/output/task1" / query["case_id"]
+    output.mkdir(parents=True)
+    (output / "prostate-biopsy-decision.json").write_text(json.dumps(decision))
+    (output / "prostate-biopsy-decision-reasoning.json").write_text(json.dumps(reasoning, indent=2))
+    (case_dir / "work/trace.json").write_text(trace.model_dump_json(by_alias=True, indent=2))
+
+
 if __name__ == "__main__":
-    directory = Path(sys.argv[1]).resolve()
+    directory, system, resources = Path(sys.argv[1]).resolve(), sys.argv[2], Path(sys.argv[3]).resolve()
     settings = Settings(**{
         k: Path(v) if k in ("data_dir", "baseline_dir", "embedding_dir") else v
         for k, v in json.loads((directory / "settings.json").read_text()).items()
     })
-    execute(directory, settings)
+    execute(directory, settings, system, resources)
