@@ -1,6 +1,6 @@
 # Task 1 agent
 
-Runs development cases through one of three systems:
+Runs cases through one of four systems:
 
 - `baseline_scaffold`: the organizers' unchanged graph, as in the baseline run.
 - `agent_v1`: our graph. It keeps the baseline's ReAct loop, tools, prompts and
@@ -12,6 +12,15 @@ Runs development cases through one of three systems:
   system prompt lists only the Task 1 tools and explains what a prior positive
   biopsy means for a new biopsy decision; the decision step also gets that framing
   and definitions of the three confidence levels. Everything else is as in agent_v1.
+- `agent_v3`: the agent_v1 graph with what the strongest challenge entries do. The MRI
+  report, PSA trend and previous notes are retrieved through the tools before the agent
+  runs, and the agent (own prompt in prompts.py) is then offered only `search_guidelines`.
+  The decision follows an EAU policy (PI-RADS 4-5: biopsy; 1-2: none; 3: biopsy if PSA
+  density > 0.20; NA: the model decides). Confidence and weights come from
+  configs/calibration_task1.json, fitted on the dev references by
+  `python -m evaluation.calibrate`; a variable whose source section was not revealed
+  is `not_used`, as the official section grounding counts it. The model writes the
+  cited claims.
 
 Our code adds safe input preparation, explicit settings, readiness checks, a
 per-case time limit, batch runs and run metadata.
@@ -19,8 +28,9 @@ per-case time limit, batch runs and run metadata.
 Runs need Linux, macOS or WSL: the runner stops process groups with `os.killpg`
 and the baseline's guideline search talks to its embedding service over a Unix
 socket. Full runs are done on Kaggle with
-[notebooks/02_agent_v1_run.ipynb](../notebooks/02_agent_v1_run.ipynb) (agent_v1) and
-[notebooks/03_agent_v2_run.ipynb](../notebooks/03_agent_v2_run.ipynb) (agent_v2).
+[notebooks/02_agent_v1_run.ipynb](../notebooks/02_agent_v1_run.ipynb) (agent_v1),
+[notebooks/03_agent_v2_run.ipynb](../notebooks/03_agent_v2_run.ipynb) (agent_v2) and
+[notebooks/04_agent_v3_run.ipynb](../notebooks/04_agent_v3_run.ipynb) (agent_v3, dev or test).
 
 ## Setup
 
@@ -56,9 +66,10 @@ The optional evaluator judge model is not part of scaffold setup.
 
     .venv/bin/python -m chimera_agent.run --name smoke_01 --system agent_v1
 
-`--system` is required (`agent_v1`, `agent_v2` or `baseline_scaffold`). Without case
+`--system` is required (`agent_v1`, `agent_v2`, `agent_v3` or `baseline_scaffold`). Without case
 options the first sorted dev case from splits/task1.json runs. Repeat `--case <dev-case-id>`
-for several cases, or use `--all-dev` for the whole dev split. Test IDs are rejected.
+for several cases, or use `--all-dev` for the whole dev split. Test IDs are rejected by `--case`;
+`--all-test` runs the whole test split and is meant for final comparisons only.
 Use --config <json-path> for explicit settings; defaults are in configs/agent.json.
 The endpoint must be local and the model must match the baseline.
 Run names cannot be reused; choose a new name for a retry.
@@ -88,9 +99,10 @@ All run files are local under results/<name>/ and may contain patient informatio
 - cases/<case>/worker.log: diagnostics.
 - cases/<case>/work/: partial outputs kept if the case fails.
 - output/task1/<case>/: the two official JSON files, published per case only on success.
-- trace/<case>.json: agent_v1 and agent_v2, the system name, the evidence items,
-  tool calls, claims with citations, check results, timings and LLM call count
-  (`schema: chimera_agent.trace/2`, defined in evidence.py).
+- trace/<case>.json: agent_v1-v3, the system name, the decision rule and whether the confidence
+  and weights are calibrated (agent_v3), the evidence
+  items, tool calls, claims with citations, check results, timings and LLM call count
+  (`schema: chimera_agent.trace/3`, defined in evidence.py).
 - run_info.json: run and per-case status, effective settings, code/model identity and timing.
 
 No output files are fabricated after an error. Staging is a filename allowlist,
@@ -109,7 +121,7 @@ keep such runs out of the shared leaderboard.
 run.py owns the batch, staging, process supervision, metadata and success-only publication.
 worker.py integrates the pinned baseline, manages the embedding service and runs
 the chosen system. graph.py is our graph, decision.py its decision step,
-prompts.py the agent_v2 prompts, evidence.py the evidence ledger, checks and trace
+prompts.py the agent_v2 and agent_v3 prompts, evidence.py the evidence ledger, checks and trace
 schema. config.py and inputs.py contain settings and input preparation. Inference does
 not import the evaluator, which alone has access to reference answers.
 

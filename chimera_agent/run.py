@@ -13,9 +13,9 @@ from pathlib import Path
 from chimera_agent.config import BASELINE_COMMIT, ROOT, Settings, config_id, load_settings
 from chimera_agent.inputs import select_cases, stage_case
 
-SYSTEMS = ("baseline_scaffold", "agent_v1", "agent_v2")
+SYSTEMS = ("baseline_scaffold", "agent_v1", "agent_v2", "agent_v3")
 # Systems that run our graph and write a trace per case.
-TRACED = ("agent_v1", "agent_v2")
+TRACED = ("agent_v1", "agent_v2", "agent_v3")
 # Readiness fields that must agree across the cases of one run.
 READINESS_IDENTITY = ("model_digest", "context_length", "embedding_revision")
 
@@ -169,15 +169,16 @@ def run(settings: Settings, name: str, system: str, cases: list[str]) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run dev cases with the unchanged baseline, agent_v1 or agent_v2")
+    parser = argparse.ArgumentParser(description="Run cases with the unchanged baseline or one of our agents")
     parser.add_argument("--name", required=True)
     parser.add_argument("--system", required=True, choices=SYSTEMS)
     parser.add_argument("--case", action="append", default=[], help="dev case ID; repeat for several")
     parser.add_argument("--all-dev", action="store_true", help="run every case of the committed dev split")
+    parser.add_argument("--all-test", action="store_true", help="run every case of the test split (final runs only)")
     parser.add_argument("--config", type=Path, default=ROOT / "configs/agent.json")
     args = parser.parse_args()
     try:
-        cases = select_cases(ROOT / "splits/task1.json", args.case, args.all_dev)
+        cases = select_cases(ROOT / "splits/task1.json", args.case, args.all_dev, args.all_test)
         directory = run(load_settings(ROOT / args.config), args.name, args.system, cases)
     except (ValueError, RuntimeError, OSError) as error:
         parser.exit(1, f"{error}\n")

@@ -38,9 +38,18 @@ class InputTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             split = Path(temp) / "split.json"
             split.write_text('{"dev":["b","a"],"test":["c"]}')
-            self.assertEqual(select_cases(split, [], False), ["a"])
-            self.assertEqual(select_cases(split, [], True), ["a", "b"])
-            self.assertEqual(select_cases(split, ["b", "a"], False), ["b", "a"])
+            self.assertEqual(select_cases(split, [], False, False), ["a"])
+            self.assertEqual(select_cases(split, [], True, False), ["a", "b"])
+            self.assertEqual(select_cases(split, ["b", "a"], False, False), ["b", "a"])
             for requested, all_dev in ((["c"], False), (["a", "c"], False), (["a", "a"], False), (["a"], True)):
                 with self.subTest(requested=requested, all_dev=all_dev), self.assertRaises(ValueError):
-                    select_cases(split, requested, all_dev)
+                    select_cases(split, requested, all_dev, False)
+
+    def test_test_split_only_on_explicit_request(self):
+        with tempfile.TemporaryDirectory() as temp:
+            split = Path(temp) / "split.json"
+            split.write_text('{"dev":["b","a"],"test":["d","c"]}')
+            self.assertEqual(select_cases(split, [], False, True), ["c", "d"])
+            for requested, all_dev in ((["a"], False), ([], True)):
+                with self.subTest(requested=requested, all_dev=all_dev), self.assertRaises(ValueError):
+                    select_cases(split, requested, all_dev, True)

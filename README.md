@@ -14,6 +14,7 @@ with decision quality at least as good as the organizers' baseline. This is a re
 | `baseline` | The organizers' agent, unchanged: a LangGraph ReAct loop over MCP tools (MRI report, PSA trend, labs, previous notes, family history, guideline search), then a form-filling LLM call. |
 | `agent_v1` | Ours. Same loop, tools, prompts and model. The final step is replaced: it sees the case record and every retrieved document and guideline passage under an ID, writes 2-4 claims that cite those IDs, and records citation and number checks in a per-case trace. |
 | `agent_v2` | agent_v1 with our own prompts: only the Task 1 tools are described, and a positive prior biopsy is framed as an existing diagnosis. It also adds confidence guidance. |
+| `agent_v3` | What the strongest challenge entries do: the MRI report, PSA trend and previous notes are always retrieved, an EAU policy decides (PI-RADS 4-5 biopsy, 1-2 none, 3 by PSA density > 0.20; the model decides only when PI-RADS is missing), confidence and weights come from a table fitted on the dev split, and the model writes the cited claims. |
 
 All systems use Gemma 4 E2B-it (`gemma4:e2b-it-q8_0`) through Ollama, EmbeddingGemma for guideline search and the
 supplied EAU guideline index.
@@ -25,7 +26,7 @@ supplied EAU guideline index.
 
 **Ours:**
 - the evidence ledger, the citing decision step, the checks and the trace;
-- the agent_v2 prompts;
+- the agent_v2 and agent_v3 prompts, the agent_v3 decision policy and calibration;
 - the batch runner with input isolation;
 - the dev/test split, the scoring harness with confidence intervals, paired tests and the leaderboard;
 - the claim-audit tooling;

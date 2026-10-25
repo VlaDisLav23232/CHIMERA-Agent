@@ -7,10 +7,13 @@ CLINICAL = "prostate-biopsy-decision-clinical-data.json"
 EMBEDDING = "prostate-modality-level-neural-representations.json"
 
 
-def select_cases(split_file: Path, requested: list[str], all_dev: bool) -> list[str]:
-    dev = json.loads(split_file.read_text())["dev"]
-    if all_dev and requested:
-        raise ValueError("Use either --case or --all-dev, not both")
+def select_cases(split_file: Path, requested: list[str], all_dev: bool, all_test: bool) -> list[str]:
+    split = json.loads(split_file.read_text())
+    if sum((bool(requested), all_dev, all_test)) > 1:
+        raise ValueError("Use only one of --case, --all-dev and --all-test")
+    if all_test:
+        return sorted(split["test"])
+    dev = split["dev"]
     cases = sorted(dev) if all_dev else requested or [sorted(dev)[0]]
     if len(set(cases)) != len(cases):
         raise ValueError("A case was requested more than once")

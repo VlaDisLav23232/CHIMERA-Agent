@@ -8,11 +8,14 @@ from pathlib import Path
 
 import requests
 
-from chimera_agent.config import BASELINE_COMMIT, Settings
+from chimera_agent.config import BASELINE_COMMIT, ROOT, Settings
 
 # The MCP client starts tool servers with only a minimal default environment; these must reach them.
 FORWARDED_ENV = ("CHIMERA_EMBED_SOCKET", "ANONYMIZED_TELEMETRY", "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE",
                  "PYTHONDONTWRITEBYTECODE")
+# Fitted on the dev references only (evaluation/calibrate.py); agent_v3 takes its confidence and weights from it.
+CALIBRATION = ROOT / "configs/calibration_task1.json"
+FETCHED = ("get_mri_report", "get_psa_trend", "get_previous_notes")
 
 
 def git_output(path: Path, *args: str) -> str:
@@ -111,12 +114,23 @@ def execute(case_dir: Path, settings: Settings, system: str, resource_dir: Path)
 
 
 def prompts_for(system: str) -> tuple[str, str]:
-    # The agent system prompt and the decision guidance; only these differ between the traced systems.
+    # The agent system prompt and the decision guidance.
     from chimera_agent_baseline.agent.prompts import build_system_prompt
 
-    from chimera_agent.prompts import AGENT_V2_DECISION_GUIDANCE, AGENT_V2_SYSTEM_PROMPT
+    from chimera_agent.prompts import AGENT_V2_DECISION_GUIDANCE, AGENT_V2_SYSTEM_PROMPT, AGENT_V3_SYSTEM_PROMPT
     return {"agent_v1": (build_system_prompt(), ""),
-            "agent_v2": (AGENT_V2_SYSTEM_PROMPT, AGENT_V2_DECISION_GUIDANCE)}[system]
+            "agent_v2": (AGENT_V2_SYSTEM_PROMPT, AGENT_V2_DECISION_GUIDANCE),
+            "agent_v3": (AGENT_V3_SYSTEM_PROMPT, "")}[system]
+
+
+def variant_for(system: str, card: dict):
+    # card is the case's structured-prompt.json, an agent input.
+    from chimera_agent.decision import eau_policy, load_calibration
+    from chimera_agent.graph import PLAIN, Variant
+    if system == "agent_v3":
+        return Variant(gate=eau_policy(card["pirads"], card["psad"]), grounded_only=True, mandatory_tools=FETCHED,
+                       agent_tools=("search_guidelines",), calibration=load_calibration(CALIBRATION))
+    return PLAIN
 
 
 async def run_traced(cfg, case_dir: Path, baseline_dir: Path, system: str) -> None:
@@ -126,6 +140,7 @@ async def run_traced(cfg, case_dir: Path, baseline_dir: Path, system: str) -> No
 
     from chimera_agent.decision import official_output
     from chimera_agent.graph import run_case
+    from chimera_agent.inputs import PROMPT
 
     input_dir = case_dir / "input/task1/agent_input"
     (query,) = load_cases(input_dir, task=1, templates_dir=baseline_dir / "templates/prompts")
@@ -137,8 +152,9 @@ async def run_traced(cfg, case_dir: Path, baseline_dir: Path, system: str) -> No
     }})
     tools = await client.get_tools()
     system_prompt, guidance = prompts_for(system)
+    variant = variant_for(system, json.loads((input_dir / query["case_id"] / PROMPT).read_text()))
     trace = await run_case(load_model(cfg), tools, system, system_prompt, guidance, query["case_id"], query["context"],
-                           cfg.agent.max_iterations)
+                           cfg.agent.max_iterations, variant)
     decision, reasoning = official_output(trace.decision, trace.tool_calls)
     output = case_dir / "work/output/task1" / query["case_id"]
     output.mkdir(parents=True)

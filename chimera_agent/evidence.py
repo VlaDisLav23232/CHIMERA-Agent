@@ -7,13 +7,19 @@ from chimera_agent_baseline.tools.definitions import TASK1_TOOLS
 from langchain_core.messages import AIMessage, ToolMessage
 from pydantic import BaseModel, ConfigDict, Field
 
-TRACE_SCHEMA = "chimera_agent.trace/2"
+TRACE_SCHEMA = "chimera_agent.trace/3"
 GUIDELINE_TOOL = "search_guidelines"
 CASE_MISMATCH = "case_id mismatch"
 SECTION_BY_TOOL = {spec.name: spec.fields[0] for spec in TASK1_TOOLS}
 NUMBER = re.compile(r"\d+(?:\.\d+)?")
 # Fixed scale legends of the baseline case template; their digits are not patient values.
 PROMPT_LEGENDS = ("(1–2 low · 3 equivocal · 4–5 high risk)", "(clinically significant PCa = ISUP ≥ 2)")
+# The official evaluator counts a weighted variable as grounded only if this section was revealed
+# (section_variable_mapping.json). Task 1 has no pathology tool, so a weight on bx is never grounded there.
+# psa, age and comorbidity need no section.
+SOURCE_SECTION = {"pirads": "radiology_report", "psad": "radiology_report", "cspca": "radiology_report",
+                  "vol": "radiology_report", "dre": "laboratory_results", "fh": "family_history",
+                  "bx": "pathology_report"}
 
 
 class Strict(BaseModel):
@@ -52,6 +58,12 @@ class DecisionRecord(Strict):
     claims: list[Claim]
 
 
+class Gate(Strict):
+    pirads: str
+    rule: str
+    biopsy_decision: bool
+
+
 class CitationIssue(Strict):
     claim: int
     ids: list[str]
@@ -77,9 +89,11 @@ class Timings(Strict):
 class Trace(Strict):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    trace_schema: Literal["chimera_agent.trace/2"] = Field(TRACE_SCHEMA, alias="schema")
+    trace_schema: Literal["chimera_agent.trace/3"] = Field(TRACE_SCHEMA, alias="schema")
     case_id: str
-    system: Literal["agent_v1", "agent_v2"]
+    system: Literal["agent_v1", "agent_v2", "agent_v3"]
+    gate: Gate | None
+    calibrated: bool
     evidence: list[EvidenceItem]
     tool_calls: list[ToolCallRecord]
     agent_message: str
@@ -157,6 +171,11 @@ def reveal_sequence(calls: list[ToolCallRecord]) -> list[str]:
             if section not in sections:
                 sections.append(section)
     return sections
+
+
+def grounded_variables(eligible: list[str], calls: list[ToolCallRecord]) -> list[str]:
+    revealed = set(reveal_sequence(calls))
+    return [v for v in eligible if v not in SOURCE_SECTION or SOURCE_SECTION[v] in revealed]
 
 
 def _numbers(text: str) -> set[float]:

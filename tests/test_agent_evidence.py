@@ -116,11 +116,11 @@ class TraceTest(unittest.TestCase):
     def test_round_trip_uses_schema_key(self):
         items, calls = build_ledger(PROMPT, synthetic_messages())
         d = decision(Claim(text="PI-RADS 4.", evidence=["P"]))
-        trace = Trace(case_id="c1", system="agent_v1", evidence=items, tool_calls=calls,
+        trace = Trace(case_id="c1", system="agent_v1", gate=None, calibrated=False, evidence=items, tool_calls=calls,
                       agent_message="Recommend biopsy.", decision=d, checks=run_checks(d, items, calls), decision_attempts=1, escape_repairs=0, llm_calls=4,
                       timings=Timings(agent_s=1.0, decision_s=0.5, total_s=1.6))
         data = json.loads(trace.model_dump_json(by_alias=True))
-        self.assertEqual(data["schema"], "chimera_agent.trace/2")
+        self.assertEqual(data["schema"], "chimera_agent.trace/3")
         self.assertEqual(Trace.model_validate(data), trace)
         with self.assertRaises(ValueError):
             Trace.model_validate({**data, "schema": "chimera_agent.trace/1"})

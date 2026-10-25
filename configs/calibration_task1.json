@@ -1,0 +1,37 @@
+{
+  "fitted_on": "dev",
+  "cases": {
+    "yes": 37,
+    "no": 23
+  },
+  "confidence": {
+    "yes": "clear",
+    "no": "clear"
+  },
+  "variable_weights": {
+    "yes": {
+      "bx": "important",
+      "fh": "noted",
+      "age": "important",
+      "dre": "noted",
+      "psa": "important",
+      "vol": "noted",
+      "psad": "noted",
+      "cspca": "not_used",
+      "pirads": "decisive",
+      "comorbidity": "noted"
+    },
+    "no": {
+      "bx": "important",
+      "fh": "noted",
+      "age": "important",
+      "dre": "noted",
+      "psa": "important",
+      "vol": "noted",
+      "psad": "noted",
+      "cspca": "not_used",
+      "pirads": "important",
+      "comorbidity": "noted"
+    }
+  }
+}

@@ -15,7 +15,11 @@ uv pip install --python .venv/bin/python -r requirements-judge.txt # only for --
 python -m evaluation.split                                         # fixed dev/test split -> splits/task1.json (already committed)
 python -m evaluation.score <run_dir> --name <run> --system <system> --temperature <t>
 python -m evaluation.leaderboard
+python -m evaluation.calibrate                                     # agent_v3 table -> configs/calibration_task1.json
 ```
+
+`calibrate` reads the dev references only: per decision, the most frequent confidence and the upper median of each
+variable weight. agent_v3 reads the JSON at inference; the test split never enters it.
 
 `<run_dir>` holds `output/task1/<case>/` with the two official output files, and optionally `run_info.json` (model tag, code commit).
 

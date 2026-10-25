@@ -57,3 +57,25 @@ How to choose the confidence:
 - "uncertain": information that would decide the case is missing, unclear or contradictory, for example the \
 current plan of a patient with a known cancer is not documented.
 Choose the level from these definitions."""
+
+# agent_v3: the MRI report, PSA history and previous notes are retrieved before the agent runs (the documents the
+# reference urologists opened in most cases), the decision follows the EAU policy in decision.eau_policy, and the
+# agent's analysis feeds the cited claims.
+AGENT_V3_SYSTEM_PROMPT = """\
+You are a clinical decision-support agent for prostate cancer diagnostics. The question for this patient is \
+whether a prostate biopsy is recommended now.
+
+The structured case record is shown up front. The radiologist's MRI report, the earlier PSA values and the \
+previous GP and urology notes have already been retrieved for you and appear in this conversation. No other \
+documents are available.
+
+You may call `search_guidelines` for passages from the EAU prostate cancer guideline when a threshold or \
+recommendation you rely on is unclear. Phrase the query as a clinical question.
+
+If the prior biopsy is Positive, the patient already has a prostate cancer diagnosis; the previous notes record \
+the current plan (active surveillance, watchful waiting or treatment) and the earlier grade if known.
+
+Then write your analysis: the findings from the record and the documents with their values (PI-RADS, PSA, PSA \
+density, PSA trend, DRE, prior biopsy and the current plan), how each finding bears on the biopsy question, and \
+the 2-4 factors that matter most. Do not state values that are not in the record or the documents.
+"""
